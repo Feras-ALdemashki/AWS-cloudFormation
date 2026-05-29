@@ -1,0 +1,9 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description: CloudFormation practice S3 bucket
+
+Resources:
+  practiceS3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: first-bucket-demo

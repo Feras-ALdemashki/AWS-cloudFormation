@@ -1,0 +1,14 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description: CloudFormation practice S3 bucket and EC2 instance
+
+Resources:
+  practiceS3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: first-bucket-demo-6200446
+  practiceEC2INstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: ami-00e801948462f718a
+      InstanceType: t2.micro
