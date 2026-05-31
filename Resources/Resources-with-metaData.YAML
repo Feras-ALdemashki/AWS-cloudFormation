@@ -1,0 +1,42 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description: CloudFormation practice S3 bucket and EC2 instance
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: "s3 storage Configuration"
+        Parameters:
+          - S3BucketName
+      - Label:
+          default: "Amazon EC2 Configuration"
+        Parameters:
+          - InstanceType
+    ParameterLabels:
+      InstanceType:
+        default: "Choose EC2 instance type"
+      S3BucketName:
+        default: "choose s3 bucket name"
+Parameters:
+  InstanceType:
+    Description: Enter t2.micro or t3.micro. Default is t2.micro.
+    Type: String
+    Default: t2.micro
+    AllowedValues:
+      - t2.micro
+      - t3.micro
+  S3BucketName:
+    Description: Enter a unique name for S3 Bucket
+    Type: String
+
+Resources:
+  practiceS3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref S3BucketName
+  practiceEC2INstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: ami-00e801948462f718a
+      InstanceType: !Ref InstanceType
