@@ -1,0 +1,99 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Creation S3,EC2,VPC and Subnet"
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: "Network Configuration"
+        Parameters:
+          - VPCCiderBlock
+          - VPCKeyValue
+          - SubnetCiderBlock
+          - SubnetKeyValue
+      - Label:
+          default: "Compute Configuration"
+        Parameters:
+          - InstanceType
+      - Label:
+          default: "Storage Configuration "
+        Parameters:
+          - S3BucketName
+    ParameterLabels:
+      VPCCiderBlock:
+        default: "Choose VPC cider block"
+      VPCKeyValue:
+        default: "Choose VPC name"
+      SubnetCiderBlock:
+        default: "Choose Subnet cider block"
+      SubnetKeyValue:
+        default: "Choose Subnet name"
+      InstanceType:
+        default: "Choose EC2 instance type"
+
+Parameters:
+  VPCCiderBlock:
+    Description: "Enter VPC cider block. Default is 10.0.0.0/16."
+    Type: String
+    Default: "10.0.0.0/16"
+    AllowedValues:
+      - "10.0.0.0/16"
+      - "10.1.0.0/16"
+      - "10.2.0.0/16"
+      - "172.16.0.0/16"
+      - "192.168.0.0/16"
+  VPCKeyValue:
+    Description: "Enter VPC name. Default is MyVPC"
+    Type: String
+    Default: "MyVPC"
+  SubnetCiderBlock:
+    Description: "Enter Subnet cider block. Default is 10.0.1.0/24"
+    Type: String
+    Default: "10.0.1.0/24"
+    AllowedValues:
+      - "10.0.1.0/24"
+      - "10.0.2.0/24"
+      - "10.0.3.0/24"
+  SubnetKeyValue:
+    Description: "Enter Subnet name. Default is MySubnet"
+    Type: String
+    Default: "MySubnet"
+  InstanceType:
+    Description: "Enter t2.micro or t3.micro. Default is t2.micro."
+    Type: String
+    Default: "t2.micro"
+    AllowedValues:
+      - "t2.micro"
+      - "t3.micro"
+  S3BucketName:
+    Description: "Enter a unique name for S3 Bucket"
+    Type: String
+
+Resources:
+  practiceVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VPCCiderBlock
+      EnableDnsHostnames: True
+      EnableDnsSupport: True
+      Tags:
+        - Key: Name
+          Value: !Ref VPCKeyValue
+  practiceSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref practiceVPC
+      CidrBlock: !Ref SubnetCiderBlock
+      Tags:
+        - Key: Name
+          Value: !Ref SubnetKeyValue
+  practiceS3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref S3BucketName
+  practiceEC2INstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: ami-00e801948462f718a
+      InstanceType: !Ref InstanceType
