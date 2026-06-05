@@ -18,6 +18,11 @@ Resources:
       LaunchTemplateData:
         ImageId: "ami-00e801948462f718a"
         InstanceType: !Ref InstanceType
+        NetworkInterfaces:
+          - DeviceIndex: 0
+            AssociatePublicIpAddress: true
+            Groups:
+              - !Ref WebServerEC2SecurityGroup
         UserData:
           Fn::Base64: |
             #!/bin/bash
@@ -50,3 +55,56 @@ Resources:
       VPCZoneIdentifier:
         - "subnet-09856c9b0e1b0e0b8"
         - "subnet-0baa48aaba98c873f"
+      TargetGroupARNs:
+        - !Ref webServerALBTargetGroup
+  webServerALB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      IpAddressType: ipv4
+      Name: webServerLoadBalancer
+      SecurityGroups:
+        - !Ref WebServerALBSecurityGroup
+      Subnets:
+        - "subnet-09856c9b0e1b0e0b8"
+        - "subnet-0baa48aaba98c873f"
+      Type: application
+  webServerALBListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref webServerALBTargetGroup
+      LoadBalancerArn: !Ref webServerALB
+      Port: 80
+      Protocol: HTTP
+  webServerALBTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: webServerTargetGroup
+      Port: 80
+      Protocol: HTTP
+      TargetType: instance
+      VpcId: vpc-05698cf708991f944
+
+  #security group
+  WebServerALBSecurityGroup:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      GroupDescription: "Allow HTTP from internet to ALB"
+      VpcId: "vpc-05698cf708991f944"
+      SecurityGroupIngress:
+        - IpProtocol: "tcp"
+          FromPort: 80
+          ToPort: 80
+          CidrIp: "0.0.0.0/0"
+
+  WebServerEC2SecurityGroup:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      GroupDescription: "Allow HTTP from ALB to EC2"
+      VpcId: "vpc-05698cf708991f944"
+      SecurityGroupIngress:
+        - IpProtocol: "tcp"
+          FromPort: 80
+          ToPort: 80
+          SourceSecurityGroupId: !Ref WebServerALBSecurityGroup
