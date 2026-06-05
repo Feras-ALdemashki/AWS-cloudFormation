@@ -108,3 +108,10 @@ Resources:
           FromPort: 80
           ToPort: 80
           SourceSecurityGroupId: !Ref WebServerALBSecurityGroup
+
+  #CloudWatch log Group
+  webServerCloudWatchLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+    LogGroupName: /aws/route53/webServer
+    RetentionInDays: 3
