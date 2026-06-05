@@ -9,6 +9,11 @@ Parameters:
     AllowedValues:
       - "t2.micro"
       - "t3.micro"
+  SNSEmailEndpoint:
+    Description: "Email address that will receive SNS notifications"
+    Type: String
+    AllowedPattern: "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"
+    ConstraintDescription: "Must be a valid email address."
 
 Resources:
   WebServerEC2LaunchTemplate:
@@ -115,3 +120,14 @@ Resources:
     Properties:
     LogGroupName: /aws/route53/webServer
     RetentionInDays: 3
+  #SNS
+  webServerSNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: web-server-alerts
+  webServerSNSSub:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Endpoint: !Ref SNSEmailEndpoint
+      Protocol: EMAIL
+      TopicArn: !Ref webServerSNSTopic
