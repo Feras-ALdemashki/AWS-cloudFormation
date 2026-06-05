@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: "Web server"
+Description: "Web server with ALB, ASG, Route 53, CloudWatch Logs, SNS, and CPU alarm"
 
 Parameters:
   InstanceType:
@@ -9,11 +9,17 @@ Parameters:
     AllowedValues:
       - "t2.micro"
       - "t3.micro"
+
   SNSEmailEndpoint:
     Description: "Email address that will receive SNS notifications"
     Type: String
     AllowedPattern: "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"
     ConstraintDescription: "Must be a valid email address."
+
+  CPUAlarmThreshold:
+    Description: "CPU percentage that will trigger the alarm"
+    Type: Number
+    Default: 70
 
 Resources:
   WebServerEC2LaunchTemplate:
@@ -62,36 +68,42 @@ Resources:
         - "subnet-0baa48aaba98c873f"
       TargetGroupARNs:
         - !Ref webServerALBTargetGroup
+
   webServerALB:
-    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Type: "AWS::ElasticLoadBalancingV2::LoadBalancer"
     Properties:
-      IpAddressType: ipv4
-      Name: webServerLoadBalancer
+      IpAddressType: "ipv4"
+      Name: "webServerLoadBalancer"
       SecurityGroups:
         - !Ref WebServerALBSecurityGroup
       Subnets:
         - "subnet-09856c9b0e1b0e0b8"
         - "subnet-0baa48aaba98c873f"
-      Type: application
+      Type: "application"
+
   webServerALBListener:
-    Type: AWS::ElasticLoadBalancingV2::Listener
+    Type: "AWS::ElasticLoadBalancingV2::Listener"
     Properties:
       DefaultActions:
-        - Type: forward
+        - Type: "forward"
           TargetGroupArn: !Ref webServerALBTargetGroup
       LoadBalancerArn: !Ref webServerALB
       Port: 80
-      Protocol: HTTP
-  webServerALBTargetGroup:
-    Type: AWS::ElasticLoadBalancingV2::TargetGroup
-    Properties:
-      Name: webServerTargetGroup
-      Port: 80
-      Protocol: HTTP
-      TargetType: instance
-      VpcId: vpc-05698cf708991f944
+      Protocol: "HTTP"
 
-  #security group
+  webServerALBTargetGroup:
+    Type: "AWS::ElasticLoadBalancingV2::TargetGroup"
+    Properties:
+      Name: "webServerTargetGroup"
+      Port: 80
+      Protocol: "HTTP"
+      TargetType: "instance"
+      VpcId: "vpc-05698cf708991f944"
+      HealthCheckPath: "/"
+      HealthCheckProtocol: "HTTP"
+      Matcher:
+        HttpCode: "200"
+
   WebServerALBSecurityGroup:
     Type: "AWS::EC2::SecurityGroup"
     Properties:
@@ -114,20 +126,96 @@ Resources:
           ToPort: 80
           SourceSecurityGroupId: !Ref WebServerALBSecurityGroup
 
-  #CloudWatch log Group
   webServerCloudWatchLogs:
-    Type: AWS::Logs::LogGroup
+    Type: "AWS::Logs::LogGroup"
     Properties:
-    LogGroupName: /aws/route53/webServer
-    RetentionInDays: 3
-  #SNS
+      LogGroupName: "/aws/route53/webServerDemo.com"
+      RetentionInDays: 3
+
+  WebServerRoute53LogsPolicy:
+    Type: "AWS::Logs::ResourcePolicy"
+    Properties:
+      PolicyName: "WebServerRoute53LogsPolicy"
+      PolicyDocument: !Sub |
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "Route53LogsToCloudWatchLogs",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "route53.amazonaws.com"
+              },
+              "Action": [
+                "logs:CreateLogStream",
+                "logs:PutLogEvents"
+              ],
+              "Resource": "arn:aws:logs:us-east-1:${AWS::AccountId}:log-group:/aws/route53/*"
+            }
+          ]
+        }
+
+  webServerRoute53HostedZone:
+    Type: "AWS::Route53::HostedZone"
+    DependsOn: WebServerRoute53LogsPolicy
+    Properties:
+      Name: "webServerDemo.com"
+      QueryLoggingConfig:
+        CloudWatchLogsLogGroupArn: !GetAtt webServerCloudWatchLogs.Arn
+
+  WebServerDNSRecord:
+    Type: "AWS::Route53::RecordSet"
+    Properties:
+      HostedZoneId: !Ref webServerRoute53HostedZone
+      Name: "www.webServerDemo.com."
+      Type: "A"
+      AliasTarget:
+        DNSName: !GetAtt webServerALB.DNSName
+        HostedZoneId: !GetAtt webServerALB.CanonicalHostedZoneID
+
   webServerSNSTopic:
-    Type: AWS::SNS::Topic
+    Type: "AWS::SNS::Topic"
     Properties:
-      TopicName: web-server-alerts
+      TopicName: "web-server-alerts"
+
   webServerSNSSub:
-    Type: AWS::SNS::Subscription
+    Type: "AWS::SNS::Subscription"
     Properties:
       Endpoint: !Ref SNSEmailEndpoint
-      Protocol: EMAIL
+      Protocol: "email"
       TopicArn: !Ref webServerSNSTopic
+
+  WebServerCPUAlarm:
+    Type: "AWS::CloudWatch::Alarm"
+    Properties:
+      AlarmName: "web-server-asg-high-cpu"
+      AlarmDescription: "Alarm when average CPU usage of the Auto Scaling Group is high"
+      Namespace: "AWS/EC2"
+      MetricName: "CPUUtilization"
+      Statistic: "Average"
+      Period: 300
+      EvaluationPeriods: 2
+      DatapointsToAlarm: 2
+      Threshold: !Ref CPUAlarmThreshold
+      ComparisonOperator: "GreaterThanThreshold"
+      TreatMissingData: "notBreaching"
+      Dimensions:
+        - Name: "AutoScalingGroupName"
+          Value: !Ref WebServerASG
+      AlarmActions:
+        - !Ref webServerSNSTopic
+      OKActions:
+        - !Ref webServerSNSTopic
+
+Outputs:
+  LoadBalancerDNSName:
+    Description: "DNS name of the Application Load Balancer"
+    Value: !GetAtt webServerALB.DNSName
+
+  Route53RecordName:
+    Description: "Route 53 record created for the web server"
+    Value: "www.webServerDemo.com"
+
+  SNSTopicArn:
+    Description: "SNS topic used for CloudWatch alarm notifications"
+    Value: !Ref webServerSNSTopic
